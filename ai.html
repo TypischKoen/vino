@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="nl">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Energiearmoede 2019–2025 | AI-vroegsignalering</title>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-title">Energiearmoede in Nederland (2019–2025)</div>
+        <div class="brand-sub">Onderzoek + AI-hoofdstuk (DTI) in simpele taal</div>
+      </div>
+      <div class="badges">
+        <div class="badge"><span class="dot"></span>Laatste update: 01-01-2026</div>
+        <div class="badge">Portfolio-website</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="side-head">
+          <h2>Navigatie</h2>
+          <p>Klik door de hoofdstukken. Plaats later je echte figuren bij de placeholders.</p>
+        </div>
+        <div class="nav">
+          <a href="index.html"><span>Start</span><small>Samenvatting + figuren</small></a>
+<a href="inleiding.html"><span>Inleiding</span><small>Vraag + afbakening</small></a>
+<a href="methode.html"><span>Methode</span><small>Bronnen & aanpak</small></a>
+<a href="analyse.html"><span>Analyse</span><small>Ontwikkeling & regio</small></a>
+<a href="ai.html"><span>AI</span><small>Decision trees etc.</small></a>
+<a href="conclusie.html"><span>Conclusie</span><small>Antwoord + tips</small></a>
+<a href="bronnen.html"><span>Bronnen</span><small>APA-lijst</small></a>
+        </div>
+      </aside>
+
+      <div class="content">
+        <div class="hero">
+          <div class="kicker">Hoofdstuk</div>
+          <h1>AI-vroegsignalering</h1>
+          <p>Drie toepassingen met simpele machine learning: decision tree, clustering en anomalieën.</p>
+          <div class="pills">
+            <span class="pill"><b>Bronnen</b> alleen NL publiek</span>
+            <span class="pill"><b>Figuur A</b> Essent heatmap</span>
+            <span class="pill"><b>AI</b> decision trees</span>
+          </div>
+        </div>
+
+        <div class="section">
+          
+<div class="card callout">
+  <b>Tip:</b> als je dit straks inlevert: zet onder elke figuur een bron + datum (en in je literatuurlijst de volledige APA).
+</div>
+
+<h2>AI-gedreven vroegsignalering</h2>
+<p>Steeds vaker komt de vraag op: kunnen we energiearmoede eerder zien aankomen, zodat hulp sneller en gerichter kan? In dit hoofdstuk beschrijf ik drie realistische toepassingen met simpele machine learning (waaronder decision trees). AI is geen wondermiddel, maar het kan wel helpen als je het netjes en eerlijk inzet.</p>
+
+<h2>1. Risicovoorspelling met decision tree (of Random Forest)</h2>
+<div class="card">
+  <p><b>Idee:</b> je gebruikt historische data om te leren welke combinaties van kenmerken vaak samenhangen met energiearmoede. Een decision tree is handig omdat je de beslisregels kunt uitleggen.</p>
+  <p><b>Voorbeeld van kenmerken:</b> inkomenscategorie, type woning (huur/koop), bouwjaar, energielabel, huishoudgrootte, (geanonimiseerd) verbruikspatroon, wijkkenmerken.</p>
+  <p><b>Risico’s:</b> privacy (AVG), bias (onbedoeld bepaalde groepen vaker labelen), en verkeerd gebruik (stigmatiseren). Daarom: zo min mogelijk persoonsgegevens, werken met pseudonimisering en duidelijke regels.</p>
+  <p><b>Succesmaat (simpel):</b> minder gemiste huishoudens die later alsnog in de problemen komen, én gerichtere inzet van hulp (minder “fout” aangeschreven huishoudens).</p>
+</div>
+
+<h2>2. Wijkclusters (k-means) voor hotspot-aanpak</h2>
+<div class="card">
+  <p><b>Idee:</b> je clustert wijken op basis van kenmerken (woningkwaliteit, inkomensniveau, energielasten, type woningen). Daarmee kun je een wijkgerichte aanpak beter plannen.</p>
+  <p><b>Benodigde data:</b> vooral geaggregeerde data op wijk/buurtniveau (CBS, gemeentelijke data, woningdata). Dit kan privacyvriendelijker zijn dan huishouden-niveau.</p>
+  <p><b>Risico’s:</b> je mist individuele situaties, en clusters kunnen “te grof” zijn. Ook kunnen wijken veranderen door renovaties of verhuisstromen.</p>
+  <p><b>Succesmaat:</b> in hotspot-wijken sneller effect zien (meer isolatiemaatregelen, minder hulpvragen rond energierekeningen).</p>
+</div>
+
+<h2>3. Anomalie-detectie: extreem laag stoken als signaal</h2>
+<div class="card">
+  <p><b>Idee:</b> sommige huishoudens lijken “niet energiearm” omdat ze heel weinig verbruiken. Maar dat kan verborgen energiearmoede zijn: mensen zetten de verwarming nauwelijks aan.</p>
+  <p><b>Data:</b> tijdreeksverbruik (slimme meters) + context (woningtype, huishouden, wijk). Dit moet heel zorgvuldig, want verbruiksdata is gevoelig.</p>
+  <p><b>Risico’s:</b> privacy, verkeerde interpretatie (bijv. mensen die weinig thuis zijn), en twijfel over toestemming.</p>
+  <p><b>Succesmaat:</b> hoeveel verborgen gevallen je eerder in beeld krijgt, zonder dat je mensen onterecht labelt.</p>
+</div>
+
+<h2>Randvoorwaarden: AVG, bias, uitlegbaarheid</h2>
+<ul>
+  <li><b>AVG:</b> werk met zo min mogelijk persoonsgegevens; kies voor aggregatie waar het kan; leg vast wie toegang heeft.</li>
+  <li><b>Bias:</b> check of het model bepaalde groepen structureel over- of onderselecteert. Test op fairness.</li>
+  <li><b>Uitlegbaarheid:</b> bij beleid is uitleg belangrijk. Decision trees scoren hier beter dan black boxes.</li>
+  <li><b>Menselijke controle:</b> AI ondersteunt. Een mens beslist, en er moet bezwaar mogelijk zijn.</li>
+</ul>
+
+<hr/>
+<p class="small"><b>Korte conclusie:</b> AI kan helpen om eerder te zien waar risico’s zitten, vooral voor wijkgerichte aanpak. Maar alleen als je privacy en eerlijkheid strak regelt, en als je kunt uitleggen waarom iemand hulp krijgt.</p>
+        </div>
+
+        <footer>
+          Gemaakt voor het Individueel Project. Vervang placeholders en check bronverwijzingen (APA).
+        </footer>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
