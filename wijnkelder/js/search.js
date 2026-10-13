@@ -82,22 +82,48 @@ export async function webSearch(queries, { maxResults = 5, country = 'NL', conte
     country,
   };
   if (domains?.length) body.search_domain_filter = domains;
+  return run(client, Perplexity, key, body, signal);
+}
+
+// De SDK stuurt extra headers mee die een browser soms tegenhoudt. Lukt de SDK-aanroep niet,
+// dan nog een keer als simpele fetch met alleen Authorization + Content-Type (zelfde endpoint en body).
+async function run(c, Perplexity, key, body, signal) {
   try {
-    const res = await client.search.create(body, { signal });
+    const res = await c.search.create(body, { signal });
     return mergeResults(res.results);
   } catch (e) {
-    throw translate(e, Perplexity);
+    if (!(e instanceof Perplexity.APIConnectionError) || e instanceof Perplexity.APIUserAbortError) throw translate(e, Perplexity);
   }
+  let res;
+  try {
+    res = await fetch('https://api.perplexity.ai/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+      body: JSON.stringify(body),
+      signal,
+    });
+  } catch (e) {
+    if (e?.name === 'AbortError') throw e;
+    throw navigator.onLine === false
+      ? new SearchError('net', 'Geen verbinding. Check je internet.')
+      : new SearchError('cors', 'Perplexity laat deze app niet zoeken (ze blokkeren verzoeken vanuit webapps).');
+  }
+  if (!res.ok) {
+    const msg = await res.text().catch(() => '');
+    if (res.status === 401) throw new SearchError('badkey', 'Je Perplexity-sleutel klopt niet. Check hem bij Instellingen.');
+    if (res.status === 429) {
+      const wait = res.headers.get('retry-after');
+      throw new SearchError('quota', `Even te veel zoekopdrachten bij Perplexity.${wait ? ` Probeer het over ${wait} seconden opnieuw.` : ' Probeer het zo opnieuw.'}`);
+    }
+    throw new SearchError(res.status >= 500 ? 'busy' : 'bad', 'Zoeken bij Perplexity lukt even niet.', msg.slice(0, 300));
+  }
+  return mergeResults((await res.json()).results);
 }
 
 export async function testSearch(key) {
   const Perplexity = await loadSdk();
-  try {
-    const res = await new Perplexity({ apiKey: key, maxRetries: 0 }).search.create({ query: 'Barolo wijn', max_results: 1 });
-    return res.results?.length ?? 0;
-  } catch (e) {
-    throw translate(e, Perplexity);
-  }
+  const results = await run(new Perplexity({ apiKey: key, maxRetries: 0 }), Perplexity, key, { query: 'Barolo wijn', max_results: 1 });
+  return results.length;
 }
 
 // Compacte tekst voor in een prompt
