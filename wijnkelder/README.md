@@ -37,6 +37,7 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 
 | Koppeling | Waarvoor | Sleutel nodig? |
 |---|---|---|
+| Perplexity (eerste keus als je tegoed hebt) | advies, etiketten, sommelier, zoekt zelf online | ja, API-sleutel met tegoed |
 | Google Gemini | advies, etiketten lezen, sommelier, online zoeken | ja, **gratis** via aistudio.google.com |
 | OpenRouter (reserve) | neemt automatisch over als Gemini het niet doet | ja, **gratis** via openrouter.ai |
 | Claude API (optioneel) | hetzelfde, betaald per gebruik | ja, eigen API-sleutel met tegoed |

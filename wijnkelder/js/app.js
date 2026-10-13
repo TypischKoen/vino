@@ -436,6 +436,11 @@ function viewSettings() {
   return `<div class="view">${back}
     <header class="top"><span class="eyebrow">Afstellen</span><h1><em>Instellingen</em></h1></header>
     <section class="card stack">
+      <h3>Perplexity <em>(je tegoed)</em></h3>
+      ${keyBlock('perplexity', 'Perplexity API-sleutel', 'pplx-...', s.perplexityKey,
+        'Op <b>perplexity.ai</b> → je profiel → <b>Settings → API</b> (of <b>API Keys</b>) → <b>Create Key</b>. Gaat van je tegoed af, ongeveer een halve tot 1 cent per vraag. Wordt als eerste gebruikt, de gratis AI hieronder is reserve.')}
+    </section>
+    <section class="card stack">
       <h3>AI <em>(gratis)</em></h3>
       <p class="small muted">Vul er één in, liefst allebei. Doet de ene het even niet, dan neemt de andere het vanzelf over.</p>
       ${keyBlock('gemini', 'Gemini van Google', 'AIza...', s.geminiKey,
@@ -448,7 +453,7 @@ function viewSettings() {
       <h3>Claude <em>(betaald, optioneel)</em></h3>
       ${keyBlock('claude', 'Claude API-sleutel', 'sk-ant-...', s.apiKey,
         'Op <b>console.anthropic.com</b> → API Keys, met wat tegoed erop. Ongeveer 1 tot 3 cent per vraag.')}
-      <label class="switch" style="border:0;padding-bottom:0"><span><b>Claude als eerste keus</b><br><span class="small muted">Anders alleen Gemini en OpenRouter.</span></span><input type="checkbox" data-change="set-prefer-claude" ${s.preferClaude ? 'checked' : ''}></label>
+      <label class="switch" style="border:0;padding-bottom:0"><span><b>Claude als eerste keus</b><br><span class="small muted">Anders Perplexity, Gemini en OpenRouter.</span></span><input type="checkbox" data-change="set-prefer-claude" ${s.preferClaude ? 'checked' : ''}></label>
     </section>
     <section class="card">
       <label class="field"><span>Je naam (voor de begroeting)</span><input id="set-name" value="${esc(s.name)}" placeholder="Koen"></label>
@@ -897,7 +902,7 @@ const ACTIONS = {
     msg.textContent = 'Testen...';
     try {
       const used = key ? await AI.testKey(p, key) : null;
-      db.saveSettings({ [{ gemini: 'geminiKey', openrouter: 'openrouterKey', claude: 'apiKey' }[p]]: key });
+      db.saveSettings({ [{ perplexity: 'perplexityKey', gemini: 'geminiKey', openrouter: 'openrouterKey', claude: 'apiKey' }[p]]: key });
       msg.className = 'small';
       msg.style.color = 'var(--ok)';
       msg.textContent = !key ? 'Sleutel gewist.' : used ? `Werkt! (${used})` : 'Werkt! Opgeslagen.';

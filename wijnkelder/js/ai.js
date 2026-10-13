@@ -1,9 +1,10 @@
-// Kiest automatisch een AI die werkt. Volgorde: Claude (alleen als je dat aanzet), Gemini, OpenRouter.
+// Kiest automatisch een AI die werkt. Volgorde: Claude (alleen als je dat aanzet), Perplexity, Gemini, OpenRouter.
 // Doet de eerste het niet (limiet op, storing), dan neemt de volgende het over.
 import { settings } from './db.js';
 import * as Claude from './ai-claude.js';
 import * as Gemini from './ai-gemini.js';
 import * as OpenRouter from './ai-openrouter.js';
+import * as Perplexity from './ai-perplexity.js';
 
 export { chatSystem } from './prompts.js';
 export const geminiWorkingModel = () => Gemini.workingModel();
@@ -14,6 +15,7 @@ export class AiError extends Error {
 
 const PROVIDERS = {
   claude: { label: 'Claude', mod: Claude, key: (s) => s.apiKey, args: (s) => [s.apiKey] },
+  perplexity: { label: 'Perplexity', mod: Perplexity, key: (s) => s.perplexityKey, args: (s) => [s.perplexityKey] },
   gemini: { label: 'Gemini', mod: Gemini, key: (s) => s.geminiKey, args: (s) => [s.geminiKey, s.geminiModel || Gemini.DEFAULT_MODEL] },
   openrouter: { label: 'OpenRouter', mod: OpenRouter, key: (s) => s.openrouterKey, args: (s) => [s.openrouterKey] },
 };
@@ -22,7 +24,7 @@ function order() {
   const s = settings();
   const list = [];
   if (s.preferClaude && s.apiKey) list.push('claude');
-  list.push('gemini', 'openrouter');
+  list.push('perplexity', 'gemini', 'openrouter');
   return list.filter((p) => PROVIDERS[p].key(s));
 }
 
@@ -32,13 +34,13 @@ export const providerLabel = () => PROVIDERS[lastUsed ?? order()[0] ?? 'gemini']
 
 export function friendlyError(e) {
   if (e instanceof AiError) return e.message;
-  return Claude.friendlyError(e) ?? Gemini.friendlyError(e) ?? OpenRouter.friendlyError(e) ?? e?.message ?? 'Er ging iets mis.';
+  return Claude.friendlyError(e) ?? Perplexity.friendlyError(e) ?? Gemini.friendlyError(e) ?? OpenRouter.friendlyError(e) ?? e?.message ?? 'Er ging iets mis.';
 }
 
-export const isAbort = (e) => Claude.isAbort(e) || Gemini.isAbort(e) || OpenRouter.isAbort(e);
+export const isAbort = (e) => Claude.isAbort(e) || Perplexity.isAbort(e) || Gemini.isAbort(e) || OpenRouter.isAbort(e);
 
 // Fouten waarbij een andere AI het wel kan: limiet, storing, verkeerde sleutel, geen gratis model
-const SWITCH = new Set(['quota', 'nofree', 'model', 'busy', 'badkey', 'denied', 'credits', 'privacy', 'region', 'empty', 'net']);
+const SWITCH = new Set(['quota', 'nofree', 'model', 'busy', 'badkey', 'denied', 'credits', 'privacy', 'region', 'empty', 'net', 'cors', 'novision', 'bad']);
 function shouldSwitch(e) {
   if (isAbort(e)) return false;
   if (e?.code && SWITCH.has(e.code)) return true;
@@ -67,6 +69,7 @@ async function run(name, ...rest) {
 
 export function testKey(p, key) {
   if (p === 'claude') return Claude.testKey(key);
+  if (p === 'perplexity') return Perplexity.testKey(key);
   if (p === 'gemini') return Gemini.testKey(key, settings().geminiModel || Gemini.DEFAULT_MODEL);
   return OpenRouter.testKey(key);
 }
