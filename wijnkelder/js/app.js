@@ -437,7 +437,7 @@ function viewSettings() {
       <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza..." value="${esc(s.geminiKey)}">
       <details class="small"><summary class="muted" style="cursor:pointer">Geavanceerd: model</summary>
         <input id="gemini-model" style="margin-top:8px" autocomplete="off" placeholder="${esc(AI.GEMINI_DEFAULT_MODEL)}" value="${esc(s.geminiModel)}">
-        <p class="small muted" style="margin-top:6px">Leeg laten = altijd het nieuwste gratis Flash-model.</p>
+        <p class="small muted" style="margin-top:6px">Leeg laten = de app zoekt zelf een model met een gratis limiet.${AI.geminiWorkingModel() ? ` Nu in gebruik: <b>${esc(AI.geminiWorkingModel())}</b>.` : ''}</p>
       </details>
       <div class="row"><button class="btn" data-action="save-key" data-provider="gemini">Opslaan en testen</button><span id="key-msg" class="small"></span></div>
       <p class="small muted">Let op: bij het gratis abonnement mag Google je vragen en foto's gebruiken om hun AI te verbeteren. Deel dus geen privé-dingen met de sommelier.</p>`
@@ -895,11 +895,11 @@ const ACTIONS = {
     msg.style.color = '';
     msg.textContent = 'Testen...';
     try {
-      if (key) await AI.testKey(which, key, model);
+      const used = key ? await AI.testKey(which, key, model) : null;
       db.saveSettings(which === 'claude' ? { apiKey: key } : { geminiKey: key, geminiModel: model });
       msg.className = 'small';
       msg.style.color = 'var(--ok)';
-      msg.textContent = key ? 'Werkt! Opgeslagen.' : 'Sleutel gewist.';
+      msg.textContent = !key ? 'Sleutel gewist.' : used ? `Werkt! Opgeslagen, gebruikt ${used}.` : 'Werkt! Opgeslagen.';
     } catch (e) {
       msg.className = 'small danger';
       msg.textContent = AI.friendlyError(e);

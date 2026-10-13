@@ -97,7 +97,7 @@ p { margin: 0; }
 .btn:disabled { opacity: .5; cursor: default; }
 .btn svg { width: 20px; height: 20px; }
 .link { background: none; border: 0; color: var(--gold); font-weight: 700; padding: 6px 2px; cursor: pointer; }
-.danger { color: var(--bad); }
+.danger { color: var(--bad); white-space: pre-line; }
 .icon-btn { width: 44px; height: 44px; border-radius: 14px; border: 0; background: var(--surface-2); display: grid; place-items: center; cursor: pointer; flex: none; }
 .icon-btn svg { width: 22px; height: 22px; }
 .icon-btn.on { background: var(--gold); color: var(--gold-ink); }

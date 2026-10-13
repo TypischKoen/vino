@@ -3,17 +3,23 @@ import { extractJson } from './wine.js';
 import * as P from './prompts.js';
 
 export const DEFAULT_MODEL = 'gemini-flash-latest';
+// Als een model geen gratis versie heeft of de limiet op is, proberen we de volgende.
+// Elk model heeft bij Google een eigen gratis dagteller.
+export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const WORKING_KEY = 'wijnkelder.geminiWorkingModel';
 
 export class GeminiError extends Error {
-  constructor(code, message, status) { super(message); this.code = code; this.status = status; }
+  constructor(code, message, status, detail = '') { super(message); this.code = code; this.status = status; this.detail = detail; }
 }
 
 const MESSAGES = {
   badkey: 'Je Gemini API-sleutel klopt niet. Check hem bij Instellingen.',
   denied: 'Deze Gemini-sleutel mag dit niet. Check of de sleutel bij een actief project hoort.',
   model: 'Dit Gemini-model bestaat niet (meer). Pas de modelnaam aan bij Instellingen, of laat hem leeg.',
-  quota: 'Je gratis Gemini-limiet is even op. Wacht een minuutje, of probeer het morgen weer.',
+  nofree: 'Geen van de Gemini-modellen heeft op dit moment een gratis limiet voor jouw sleutel.',
+  quota: 'Je gratis Gemini-limiet is op voor alle modellen. Probeer het over een minuut, of morgen weer.',
+  region: 'Gemini is niet beschikbaar in jouw land of voor dit account.',
   busy: 'Gemini is even overbelast. Probeer het zo nog eens.',
   refused: 'Gemini wilde hier niet op ingaan. Probeer het anders te omschrijven.',
   cut: 'Het antwoord werd te lang en is afgekapt. Probeer het nog eens.',
@@ -21,8 +27,10 @@ const MESSAGES = {
   net: 'Geen verbinding. Check je internet.',
 };
 
+// Laat ook zien wat Google zelf zei, dan weet je waar het aan ligt
 export function friendlyError(e) {
-  return e instanceof GeminiError ? e.message : null;
+  if (!(e instanceof GeminiError)) return null;
+  return e.detail ? `${e.message}\n\nGoogle zegt: ${e.detail.slice(0, 220)}` : e.message;
 }
 
 export const isAbort = (e) => e?.name === 'AbortError';
@@ -32,39 +40,74 @@ async function raise(res) {
   try { body = await res.json(); } catch {}
   const msg = body.error?.message ?? '';
   const status = body.error?.status ?? '';
-  if (res.status === 400 && /api key/i.test(msg)) throw new GeminiError('badkey', MESSAGES.badkey, 400);
-  if (res.status === 401 || res.status === 403) throw new GeminiError('denied', MESSAGES.denied, res.status);
-  if (res.status === 404) throw new GeminiError('model', MESSAGES.model, 404);
-  if (res.status === 429 || status === 'RESOURCE_EXHAUSTED') throw new GeminiError('quota', MESSAGES.quota, 429);
-  if (res.status >= 500) throw new GeminiError('busy', MESSAGES.busy, res.status);
-  throw new GeminiError('bad', `Gemini snapte het verzoek niet: ${msg || res.status}`, res.status);
-}
-
-async function call(key, model, method, body, signal) {
-  let res;
-  try {
-    res = await fetch(`${BASE}/models/${encodeURIComponent(model)}:${method}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-      body: JSON.stringify(body),
-      signal,
-    });
-  } catch (e) {
-    if (isAbort(e)) throw e;
-    throw new GeminiError('net', MESSAGES.net);
+  if (res.status === 400 && /api key/i.test(msg)) throw new GeminiError('badkey', MESSAGES.badkey, 400, msg);
+  if (res.status === 400 && /location|region|country/i.test(msg)) throw new GeminiError('region', MESSAGES.region, 400, msg);
+  if (res.status === 401 || res.status === 403) throw new GeminiError('denied', MESSAGES.denied, res.status, msg);
+  if (res.status === 404) throw new GeminiError('model', MESSAGES.model, 404, msg);
+  if (res.status === 429 || status === 'RESOURCE_EXHAUSTED') {
+    // "limit: 0" betekent: dit model heeft helemaal geen gratis versie
+    const code = /limit:\s*0\b/.test(msg) ? 'nofree' : 'quota';
+    throw new GeminiError(code, MESSAGES[code], 429, msg);
   }
-  if (!res.ok) await raise(res);
-  return res;
+  if (res.status >= 500) throw new GeminiError('busy', MESSAGES.busy, res.status, msg);
+  throw new GeminiError('bad', `Gemini snapte het verzoek niet: ${msg || res.status}`, res.status, '');
 }
 
+function remembered() {
+  try { return localStorage.getItem(WORKING_KEY); } catch { return null; }
+}
+export const workingModel = () => remembered();
+function remember(model) {
+  try { localStorage.setItem(WORKING_KEY, model); } catch {}
+}
+
+// Eigen model van de gebruiker eerst, dan het model dat de vorige keer werkte, dan de vaste lijst
+function candidates(preferred) {
+  const custom = preferred && preferred !== DEFAULT_MODEL ? [preferred] : [];
+  return [...new Set([...custom, remembered(), ...FALLBACK_MODELS].filter(Boolean))];
+}
+
+const RETRYABLE = new Set(['nofree', 'quota', 'model']);
+
+async function call(key, preferred, method, body, signal) {
+  let lastError;
+  let sawQuota = false;
+  for (const model of candidates(preferred)) {
+    let res;
+    try {
+      res = await fetch(`${BASE}/models/${encodeURIComponent(model)}:${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify(body),
+        signal,
+      });
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      throw new GeminiError('net', MESSAGES.net);
+    }
+    if (res.ok) {
+      remember(model);
+      res.model = model;
+      return res;
+    }
+    try { await raise(res); } catch (e) {
+      if (!RETRYABLE.has(e.code)) throw e;
+      if (e.code === 'quota') sawQuota = true;
+      lastError = e;
+    }
+  }
+  // Alles geprobeerd: zeg of het "geen gratis versie" of "limiet op" was
+  if (sawQuota && lastError.code !== 'quota') throw new GeminiError('quota', MESSAGES.quota, 429, lastError.detail);
+  if (lastError?.code === 'model') throw lastError;
+  throw new GeminiError(lastError?.code ?? 'quota', MESSAGES[lastError?.code] ?? MESSAGES.quota, 429, lastError?.detail);
+}
+
+// Echte mini-vraag, zodat je meteen ziet of er een gratis model werkt. Geeft het werkende model terug.
 export async function testKey(key, model = DEFAULT_MODEL) {
-  let res;
-  try {
-    res = await fetch(`${BASE}/models/${encodeURIComponent(model)}`, { headers: { 'x-goog-api-key': key } });
-  } catch {
-    throw new GeminiError('net', MESSAGES.net);
-  }
-  if (!res.ok) await raise(res);
+  const res = await call(key, model, 'generateContent', {
+    contents: [{ role: 'user', parts: [{ text: 'Antwoord met alleen het woord: ok' }] }],
+  });
+  return res.model;
 }
 
 // Gemini wil geen additionalProperties in het schema
