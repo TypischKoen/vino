@@ -5,6 +5,7 @@ import * as Gemini from './ai-gemini.js';
 
 export { chatSystem } from './prompts.js';
 export const GEMINI_DEFAULT_MODEL = Gemini.DEFAULT_MODEL;
+export const geminiWorkingModel = () => Gemini.workingModel();
 
 export class AiError extends Error {
   constructor(code, message) { super(message); this.code = code; }
