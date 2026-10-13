@@ -108,12 +108,12 @@ export async function importAll(data, { replace = false } = {}) {
 
 // Instellingen: klein en per toestel
 const SETTINGS_KEY = 'wijnkelder.settings';
-const DEFAULTS = { provider: 'gemini', geminiKey: '', geminiModel: '', apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
+const DEFAULTS = { preferClaude: false, openrouterKey: '', geminiKey: '', geminiModel: '', apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
 export function settings() {
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {}; } catch {}
-  // Wie al een Claude-sleutel had van voor de Gemini-optie, blijft op Claude
-  if (!stored.provider && stored.apiKey) stored.provider = 'claude';
+  // Wie Claude al gebruikte, blijft Claude als eerste keus houden
+  if (!('preferClaude' in stored) && stored.apiKey && stored.provider !== 'gemini') stored.preferClaude = true;
   return { ...DEFAULTS, ...stored };
 }
 export function saveSettings(patch) {

@@ -422,30 +422,33 @@ function viewWishlist() {
   </div>`;
 }
 
+function keyBlock(p, title, hint, value, howto) {
+  return `<div class="stack" style="gap:8px;padding-top:6px">
+    <b>${title}</b>
+    <p class="small muted">${howto}</p>
+    <input id="key-${p}" type="password" autocomplete="off" placeholder="${esc(hint)}" value="${esc(value)}">
+    <div class="row"><button class="btn sm" data-action="save-key" data-provider="${p}">Opslaan en testen</button><span id="msg-${p}" class="small"></span></div>
+  </div>`;
+}
+
 function viewSettings() {
   const s = db.settings();
   return `<div class="view">${back}
     <header class="top"><span class="eyebrow">Afstellen</span><h1><em>Instellingen</em></h1></header>
     <section class="card stack">
-      <h3>Welke AI?</h3>
-      <div class="wrap-chips">
-        <button class="chip" data-action="set-provider" data-provider="gemini" aria-pressed="${AI.provider() === 'gemini'}">Gemini · gratis</button>
-        <button class="chip" data-action="set-provider" data-provider="claude" aria-pressed="${AI.provider() === 'claude'}">Claude · betaald</button>
-      </div>
-      ${AI.provider() === 'gemini' ? `
-      <p class="small muted">Gratis binnen de limieten van Google. Maak een sleutel op <b>aistudio.google.com</b> → <b>Get API key</b> → <b>Create API key</b>. Geen creditcard nodig.</p>
-      <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza..." value="${esc(s.geminiKey)}">
-      <details class="small"><summary class="muted" style="cursor:pointer">Geavanceerd: model</summary>
-        <input id="gemini-model" style="margin-top:8px" autocomplete="off" placeholder="${esc(AI.GEMINI_DEFAULT_MODEL)}" value="${esc(s.geminiModel)}">
-        <p class="small muted" style="margin-top:6px">Leeg laten = de app zoekt zelf een model met een gratis limiet.${AI.geminiWorkingModel() ? ` Nu in gebruik: <b>${esc(AI.geminiWorkingModel())}</b>.` : ''}</p>
-      </details>
-      <div class="row"><button class="btn" data-action="save-key" data-provider="gemini">Opslaan en testen</button><span id="key-msg" class="small"></span></div>
-      <p class="small muted">Let op: bij het gratis abonnement mag Google je vragen en foto's gebruiken om hun AI te verbeteren. Deel dus geen privé-dingen met de sommelier.</p>`
-      : `
-      <p class="small muted">Maak een sleutel op <b>console.anthropic.com</b> → API Keys en zet er wat tegoed op. Een advies kost ongeveer 1 tot 3 cent.</p>
-      <input id="api-key" type="password" autocomplete="off" placeholder="sk-ant-..." value="${esc(s.apiKey)}">
-      <div class="row"><button class="btn" data-action="save-key" data-provider="claude">Opslaan en testen</button><span id="key-msg" class="small"></span></div>`}
-      <p class="small muted">Je sleutel blijft op dit toestel en gaat alleen naar ${AI.provider() === 'gemini' ? 'Google' : 'Anthropic'}.</p>
+      <h3>AI <em>(gratis)</em></h3>
+      <p class="small muted">Vul er één in, liefst allebei. Doet de ene het even niet, dan neemt de andere het vanzelf over.</p>
+      ${keyBlock('gemini', 'Gemini van Google', 'AIza...', s.geminiKey,
+        'Ga naar <b>aistudio.google.com</b> → <b>Get API key</b> → <b>Create API key</b>. Log in met je Google-account, geen creditcard nodig.')}
+      ${keyBlock('openrouter', 'OpenRouter (reserve)', 'sk-or-...', s.openrouterKey,
+        'Maak een account op <b>openrouter.ai</b> → <b>Keys</b> → <b>Create Key</b>. Geen creditcard nodig. Zet daarna bij <b>Settings → Privacy</b> de gratis modellen aan.')}
+      <p class="small muted">Gratis AI mag je vragen en foto's gebruiken om te trainen. Deel geen privé-dingen met de sommelier. Je sleutels blijven op dit toestel.</p>
+    </section>
+    <section class="card stack">
+      <h3>Claude <em>(betaald, optioneel)</em></h3>
+      ${keyBlock('claude', 'Claude API-sleutel', 'sk-ant-...', s.apiKey,
+        'Op <b>console.anthropic.com</b> → API Keys, met wat tegoed erop. Ongeveer 1 tot 3 cent per vraag.')}
+      <label class="switch" style="border:0;padding-bottom:0"><span><b>Claude als eerste keus</b><br><span class="small muted">Anders alleen Gemini en OpenRouter.</span></span><input type="checkbox" data-change="set-prefer-claude" ${s.preferClaude ? 'checked' : ''}></label>
     </section>
     <section class="card">
       <label class="field"><span>Je naam (voor de begroeting)</span><input id="set-name" value="${esc(s.name)}" placeholder="Koen"></label>
@@ -634,7 +637,7 @@ function addSheet() {
       <button class="method" data-action="add-text" ${key ? '' : 'aria-disabled="true"'}><span class="ic">✍️</span><b>Typ het</b><span>"6 flessen Cava en een Barolo 2018"</span></button>
       <button class="method" data-action="add-manual"><span class="ic">📝</span><b>Zelf invullen</b><span>Alle velden met de hand</span></button>
     </div>
-    ${key ? '' : '<p class="small muted">Foto en typen werken met AI. Zet een (gratis) Gemini-sleutel bij Meer > Instellingen.</p>'}
+    ${key ? '' : '<p class="small muted">Foto en typen werken met AI. Zet een gratis sleutel bij Meer > Instellingen.</p>'}
     <div id="add-status"></div>`);
 }
 
@@ -885,21 +888,19 @@ const ACTIONS = {
     const item = S.wishlist.find((x) => x.id === el.dataset.id);
     wineForm({ name: item.text }, { title: 'Gekocht!', onDone: async (w) => { await addWines([w], w.photo); await db.put('wishlist', { ...item, done: true }); toast('In de kelder gezet'); } });
   },
-  'set-provider': (el) => { db.saveSettings({ provider: el.dataset.provider }); render(); },
   'save-key': async (el) => {
-    const which = el.dataset.provider;
-    const key = $(which === 'claude' ? '#api-key' : '#gemini-key').value.trim();
-    const model = $('#gemini-model')?.value.trim() ?? '';
-    const msg = $('#key-msg');
+    const p = el.dataset.provider;
+    const key = $(`#key-${p}`).value.trim();
+    const msg = $(`#msg-${p}`);
     msg.className = 'small muted';
     msg.style.color = '';
     msg.textContent = 'Testen...';
     try {
-      const used = key ? await AI.testKey(which, key, model) : null;
-      db.saveSettings(which === 'claude' ? { apiKey: key } : { geminiKey: key, geminiModel: model });
+      const used = key ? await AI.testKey(p, key) : null;
+      db.saveSettings({ [{ gemini: 'geminiKey', openrouter: 'openrouterKey', claude: 'apiKey' }[p]]: key });
       msg.className = 'small';
       msg.style.color = 'var(--ok)';
-      msg.textContent = !key ? 'Sleutel gewist.' : used ? `Werkt! Opgeslagen, gebruikt ${used}.` : 'Werkt! Opgeslagen.';
+      msg.textContent = !key ? 'Sleutel gewist.' : used ? `Werkt! (${used})` : 'Werkt! Opgeslagen.';
     } catch (e) {
       msg.className = 'small danger';
       msg.textContent = AI.friendlyError(e);
@@ -984,6 +985,7 @@ const CHANGES = {
   },
   'wish-done': (el) => db.put('wishlist', { ...S.wishlist.find((x) => x.id === el.dataset.id), done: el.checked }),
   'set-web': (el) => db.saveSettings({ webSearch: el.checked }),
+  'set-prefer-claude': (el) => db.saveSettings({ preferClaude: el.checked }),
   'set-theme': (el) => db.saveSettings({ theme: el.value }),
   'set-weather': async (el) => {
     db.saveSettings({ weather: el.checked });

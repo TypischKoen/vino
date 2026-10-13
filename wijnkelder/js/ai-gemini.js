@@ -2,10 +2,10 @@
 import { extractJson } from './wine.js';
 import * as P from './prompts.js';
 
-export const DEFAULT_MODEL = 'gemini-flash-latest';
+export const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 // Als een model geen gratis versie heeft of de limiet op is, proberen we de volgende.
 // Elk model heeft bij Google een eigen gratis dagteller.
-export const FALLBACK_MODELS = ['gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+export const FALLBACK_MODELS = ['gemini-3.5-flash-lite', 'gemini-3.5-flash', 'gemini-flash-lite-latest', 'gemini-flash-latest'];
 const BASE = 'https://generativelanguage.googleapis.com/v1beta';
 const WORKING_KEY = 'wijnkelder.geminiWorkingModel';
 
@@ -72,7 +72,12 @@ const RETRYABLE = new Set(['nofree', 'quota', 'model']);
 async function call(key, preferred, method, body, signal) {
   let lastError;
   let sawQuota = false;
-  for (const model of candidates(preferred)) {
+  const queue = candidates(preferred);
+  const tried = new Set();
+  while (queue.length) {
+    const model = queue.shift();
+    if (tried.has(model)) continue;
+    tried.add(model);
     let res;
     try {
       res = await fetch(`${BASE}/models/${encodeURIComponent(model)}:${method}`, {
@@ -92,6 +97,9 @@ async function call(key, preferred, method, body, signal) {
     }
     try { await raise(res); } catch (e) {
       if (!RETRYABLE.has(e.code)) throw e;
+      // Google noemt soms zelf de opvolger: "Please update your code to use models/gemini-..."
+      const hint = e.detail?.match(/use\s+(?:models\/)?(gemini-[\w.-]*\w)/i)?.[1];
+      if (hint && !tried.has(hint)) queue.unshift(hint);
       if (e.code === 'quota') sawQuota = true;
       lastError = e;
     }
