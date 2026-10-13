@@ -23,7 +23,7 @@ export async function resize(blob, maxSide = 1280, quality = 0.82) {
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
 }
 
-export async function toClaudeImage(blob) {
+export async function toAiImage(blob) {
   const small = await resize(blob, 1400, 0.85);
   const data = await new Promise((resolve, reject) => {
     const r = new FileReader();
