@@ -1,43 +1,73 @@
 # Wijnkelder
 
-Houdt je wijnvoorraad bij en kiest met AI een fles **uit je eigen kelder** bij wat je eet.
+Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier die bij elk gerecht een fles uit **je eigen kelder** kiest.
 
-## Wat zit erin
+## Wat kan hij
 
-- **Voorraad**: flessen toevoegen, +/- per fles, zoeken, verwijderen. Opslag in `data/wines.json`.
-- **Vivino import**: Vivino heeft geen openbare API. Vraag je data op via vivino.com > Settings > Privacy > download je data en upload de CSV. Kolomnamen worden automatisch herkend (ook Nederlandse varianten). Zelfde producent + naam + jaar wordt samengevoegd.
-- **Google lookup**: zoek een wijn op via de Google Custom Search JSON API, of klik 🔎 bij een fles om beschrijving, link en etiketfoto aan te vullen.
-- **AI wijnadvies**: typ je gerecht, Claude kiest 1 fles + 2 alternatieven uit wat je op voorraad hebt, met uitleg. Met "Deze trek ik open" gaat er direct een fles van de voorraad af. De server checkt dat de gekozen wijn echt in je kelder staat.
+**Vandaag**
+- Typ wat je eet, maak een foto van je bord of plak een recept-link. Claude kiest een fles uit je kelder, geeft een matchscore (1 tot 10), zegt hoe je hem serveert en hoeveel flessen je nodig hebt voor het aantal mensen.
+- Wensen erbij: licht en fris, feestelijk, "op = op", verras me.
+- Past er niks? Dan krijg je een koop-tip die je op je kooplijst zet.
+- "Drink deze binnenkort": flessen waarvan het drinkvenster bijna dicht is.
+- Je kelder in cijfers: flessen, waarde, oudste jaargang, verdeling per soort.
+- Optioneel: weer-tip op basis van het weer bij jou.
 
-## Starten
+**Toevoegen (rode +)**
+- 📸 Foto van een etiket, of van je hele rek in één keer. Claude leest alle flessen.
+- ▥ Streepjescode scannen met de camera (opzoeken via Open Food Facts, Claude vult aan).
+- ✍️ Typ het gewoon: "6 flessen Cava en een Barolo 2018".
+- 📝 Zelf invullen.
+- Druif, regio, drinkvenster, smaak, prijsindicatie en "past bij" worden automatisch ingevuld. Jij checkt het even.
 
-Node 22 of nieuwer.
+**Kelder**
+- Zoeken, filteren op soort en drinkstatus (nog bewaren / op dronk / drink snel / over de top), sorteren.
+- Per fles: foto, alle info, voorraad +/−, je eigen score, waar hij ligt, notities, wanneer je hem eerder opende.
+- "Info opzoeken" zoekt online (Claude web search) naar smaak, drinkvenster en prijs.
 
-```bash
-cd wijnkelder
-npm install
-cp .env.example .env   # vul je sleutels in
-npm start              # http://localhost:3000
-```
+**Sommelier**
+- Chat die je hele kelder kent. Stuur gerust een foto mee van een wijnkaart of een fles in de winkel.
+- Mag online zoeken voor prijzen, recensies en recepten (uit te zetten).
 
-### Sleutels
+**Meer**
+- Logboek van geopende flessen met score.
+- Kooplijst.
+- Backup (met foto's) naar iCloud Drive of waar je wilt, export naar Excel (CSV), backup terugzetten.
 
-| Variabele | Waarvoor | Waar te halen |
+## Koppelingen
+
+| Koppeling | Waarvoor | Sleutel nodig? |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | wijnadvies | console.anthropic.com |
-| `GOOGLE_API_KEY` | wijn opzoeken | Google Cloud console, zet "Custom Search API" aan |
-| `GOOGLE_CSE_ID` | wijn opzoeken | programmablesearchengine.google.com, maak een zoekmachine aan |
+| Claude API (Anthropic) | advies, etiketten lezen, sommelier, online zoeken | ja, je eigen API-sleutel |
+| Open Food Facts | streepjescode opzoeken | nee |
+| Open-Meteo | weer-tip | nee |
+| Safari camera + locatie | scannen, foto's, weer | toestemming |
 
-Zonder sleutels werkt de voorraad gewoon, alleen advies en opzoeken staan dan uit.
+## Op je iPhone zetten
 
-## Testen
+1. Zet de app online (zie hieronder) en open de link in **Safari**.
+2. Deel-knop → **Zet op beginscherm** → **Voeg toe**.
+3. Open de app, ga naar **Meer → Instellingen** en plak je Claude API-sleutel (aan te maken op console.anthropic.com). Een advies kost ongeveer 1 tot 3 cent.
+
+## Online zetten met GitHub Pages (gratis)
+
+1. Merge deze branch naar `main`.
+2. GitHub → repo → **Settings → Pages** → Source: *Deploy from a branch* → `main` en `/ (root)` → Save.
+3. Na een minuut staat de app op `https://<gebruikersnaam>.github.io/<repo>/wijnkelder/`.
+
+## Goed om te weten
+
+- Alles (flessen, foto's, logboek) staat **alleen op je telefoon**. Maak af en toe een backup via Meer → Backup.
+- De API-sleutel staat ook alleen op je telefoon en gaat direct naar Anthropic. Iedereen die jouw telefoon gebruikt kan hem dus gebruiken.
+- Na het toevoegen aan je beginscherm werkt de app ook offline. Alleen advies, scannen en de sommelier hebben internet nodig.
+
+## Voor ontwikkelaars
+
+De app is gewone HTML, CSS en JavaScript zonder build-stap. `vendor/` bevat de Anthropic SDK en een barcode-lezer, gebundeld door `tools/build-vendor.mjs`.
 
 ```bash
-npm test
+cd tools && npm install
+npm run vendor   # libraries opnieuw bundelen
+npm test         # unit tests van js/wine.js
 ```
 
-## Beperkingen
-
-- Draait lokaal zonder login. Zet je het online, bouw dan eerst authenticatie in, anders kan iedereen je kelder aanpassen en je API-tegoed opmaken.
-- Vivino sync is eenmalig per import, niet live. Drink je een fles, tik dan op − of gebruik de knop bij het advies.
-- Google Custom Search is gratis tot 100 zoekopdrachten per dag.
+Lokaal draaien: `python3 -m http.server` in deze map en open `http://localhost:8000`.
