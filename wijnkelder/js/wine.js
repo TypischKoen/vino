@@ -51,6 +51,14 @@ export function normalizeWine(raw = {}) {
   if (w.rating != null) w.rating = Math.max(0, Math.min(5, w.rating));
   if (w.vintage != null && (w.vintage < 1800 || w.vintage > 2100)) delete w.vintage;
   for (const k of ['id', 'photo', 'added', 'updated']) if (raw[k] != null) w[k] = raw[k];
+  // Bronnen van "Info opzoeken": alleen http(s)-links, en niet te veel
+  if (Array.isArray(raw.sources)) {
+    const sources = raw.sources
+      .filter((r) => r && /^https?:\/\//i.test(r.url ?? '') && r.title)
+      .slice(0, 6)
+      .map((r) => ({ title: String(r.title).slice(0, 200), url: String(r.url).slice(0, 500), ...(r.date ? { date: String(r.date).slice(0, 40) } : {}) }));
+    if (sources.length) w.sources = sources;
+  }
   return w;
 }
 

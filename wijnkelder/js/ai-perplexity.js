@@ -1,6 +1,7 @@
 // Perplexity (Sonar): betaald van je tegoed, zoekt zelf op internet. Handig voor wijninfo en prijzen.
 import { extractJson } from './wine.js';
 import * as P from './prompts.js';
+import { promptFor } from './prompts.js';
 
 const BASE = 'https://api.perplexity.ai';
 export const MODEL = 'sonar';
@@ -93,18 +94,18 @@ export async function testKey(key) {
   return MODEL;
 }
 
-export async function identify(key, { text, image, product }) {
+export async function identify(key, { text, image, product, search }) {
   const r = await askJson(key, {
     system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, image,
-    text: image ? P.IDENTIFY_IMAGE : product ? P.IDENTIFY_PRODUCT(product) : P.IDENTIFY_TEXT(text),
+    text: promptFor({ text, image, product, search }),
   });
   return Array.isArray(r) ? r : r.wines ?? [];
 }
 
-export async function enrichOnline(key, wine) {
+export async function enrichOnline(key, wine, sources) {
   const r = await askJson(key, {
-    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, search: true,
-    text: `${P.ENRICH(wine)} Geef precies één wijn in de lijst.`,
+    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, search: !sources,
+    text: sources ? P.ENRICH_FROM_SOURCES(wine, sources) : `${P.ENRICH(wine)} Geef precies één wijn in de lijst.`,
   });
   return Array.isArray(r) ? r[0] : r.wines?.[0] ?? r;
 }

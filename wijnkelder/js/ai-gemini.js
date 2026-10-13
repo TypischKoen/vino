@@ -1,6 +1,7 @@
 // Google Gemini als AI. Gratis te gebruiken binnen de limieten van Google AI Studio.
 import { extractJson } from './wine.js';
 import * as P from './prompts.js';
+import { promptFor } from './prompts.js';
 
 export const DEFAULT_MODEL = 'gemini-3.5-flash-lite';
 // Als een model geen gratis versie heeft of de limiet op is, proberen we de volgende.
@@ -160,15 +161,19 @@ async function askJson(key, model, { system, parts, schema, tools }) {
   return extractJson(textParts(cand.content?.parts));
 }
 
-export async function identify(key, model, { text, image, product }) {
+export async function identify(key, model, { text, image, product, search }) {
   const parts = [];
   if (image) parts.push(imagePart(image));
-  parts.push({ text: image ? P.IDENTIFY_IMAGE : product ? P.IDENTIFY_PRODUCT(product) : P.IDENTIFY_TEXT(text) });
+  parts.push({ text: promptFor({ text, image, product, search }) });
   const r = await askJson(key, model, { system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, parts });
   return Array.isArray(r) ? r : r.wines ?? [];
 }
 
-export async function enrichOnline(key, model, wine) {
+export async function enrichOnline(key, model, wine, sources) {
+  if (sources) {
+    const r = await askJson(key, model, { system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, parts: [{ text: P.ENRICH_FROM_SOURCES(wine, sources) }] });
+    return r.wines?.[0] ?? {};
+  }
   const r = await askJson(key, model, {
     system: P.IDENTIFY_SYSTEM(), tools: [{ googleSearch: {} }],
     parts: [{ text: P.ENRICH(wine) }],

@@ -39,7 +39,7 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 |---|---|---|
 | Perplexity (eerste keus als je tegoed hebt) | advies, etiketten, sommelier, zoekt zelf online | ja, API-sleutel met tegoed |
 | Google Gemini | advies, etiketten lezen, sommelier, online zoeken | ja, **gratis** via aistudio.google.com |
-| OpenRouter (reserve) | neemt automatisch over als Gemini het niet doet | ja, **gratis** via openrouter.ai |
+| Perplexity Search API | echte zoekresultaten voor "Info opzoeken" en onbekende barcodes (bronnen staan bij de fles) | dezelfde Perplexity-sleutel |
 | Claude API (optioneel) | hetzelfde, betaald per gebruik | ja, eigen API-sleutel met tegoed |
 | Open Food Facts | streepjescode opzoeken | nee |
 | Open-Meteo | weer-tip | nee |
@@ -49,10 +49,10 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 
 1. Zet de app online (zie hieronder) en open de link in **Safari**.
 2. Deel-knop → **Zet op beginscherm** → **Voeg toe**.
-3. Open de app, ga naar **Meer → Instellingen** en vul een gratis sleutel in, liefst allebei:
-   - **Gemini**: aistudio.google.com → Get API key → Create API key.
-   - **OpenRouter** (reserve): openrouter.ai → Keys → Create Key, en zet bij Settings → Privacy de gratis modellen aan.
-   De app kiest zelf een werkend model en schakelt vanzelf over als de ene dienst het niet doet. Gratis AI mag je vragen gebruiken om te trainen.
+3. Open de app, ga naar **Meer → Instellingen** en vul je sleutels in:
+   - **Perplexity** (tegoed): console.perplexity.ai → API Keys. Gebruikt voor advies, sommelier en online zoeken.
+   - **Gemini** (gratis reserve): aistudio.google.com → Get API key → Create API key.
+   De app schakelt vanzelf over als de ene dienst het niet doet. Gratis AI mag je vragen gebruiken om te trainen.
 
 ## Online zetten met GitHub Pages (gratis)
 
@@ -68,12 +68,13 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 
 ## Voor ontwikkelaars
 
-De app is gewone HTML, CSS en JavaScript zonder build-stap. `vendor/` bevat de Anthropic SDK en een barcode-lezer, gebundeld door `tools/build-vendor.mjs`.
+De app is gewone HTML, CSS en JavaScript zonder build-stap. `vendor/` bevat de Anthropic SDK, de Perplexity SDK en een barcode-lezer, gebundeld door `tools/build-vendor.mjs`.
 
 ```bash
 cd tools && npm install
 npm run vendor   # libraries opnieuw bundelen
-npm test         # unit tests van js/wine.js
+npm test         # unit tests
+npm run smoke:search   # echte test van de Search API; zet eerst PERPLEXITY_API_KEY in je eigen terminal
 ```
 
 Lokaal draaien: `python3 -m http.server` in deze map en open `http://localhost:8000`.
