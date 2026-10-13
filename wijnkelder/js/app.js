@@ -4,6 +4,7 @@ import { TYPES, TYPE_KEYS, STATUS_LABEL, SORTS, label, drinkStatus, stats, match
 import { startScanner, scanImage, lookupBarcode } from './scan.js';
 import { toAiImage, thumbnail } from './image.js';
 import * as weather from './weather.js';
+import { webSearch, hasSearchKey, sourcesForPrompt, testSearch } from './search.js';
 
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -436,19 +437,21 @@ function viewSettings() {
   return `<div class="view">${back}
     <header class="top"><span class="eyebrow">Afstellen</span><h1><em>Instellingen</em></h1></header>
     <section class="card stack">
-      <h3>AI <em>(gratis)</em></h3>
-      <p class="small muted">Vul er één in, liefst allebei. Doet de ene het even niet, dan neemt de andere het vanzelf over.</p>
+      <h3>Perplexity <em>(je tegoed)</em></h3>
+      ${keyBlock('perplexity', 'Perplexity API-sleutel', 'pplx-...', s.perplexityKey,
+        'Maak een sleutel in de <b>API Console</b> op <b>console.perplexity.ai</b> → <b>API Keys</b>. Gaat van je tegoed af, ongeveer een halve tot 1 cent per vraag. Wordt als eerste gebruikt voor advies en de sommelier, en voor <b>online zoeken</b> bij "Info opzoeken" en onbekende barcodes.')}
+    </section>
+    <section class="card stack">
+      <h3>Gemini <em>(gratis reserve)</em></h3>
       ${keyBlock('gemini', 'Gemini van Google', 'AIza...', s.geminiKey,
-        'Ga naar <b>aistudio.google.com</b> → <b>Get API key</b> → <b>Create API key</b>. Log in met je Google-account, geen creditcard nodig.')}
-      ${keyBlock('openrouter', 'OpenRouter (reserve)', 'sk-or-...', s.openrouterKey,
-        'Maak een account op <b>openrouter.ai</b> → <b>Keys</b> → <b>Create Key</b>. Geen creditcard nodig. Zet daarna bij <b>Settings → Privacy</b> de gratis modellen aan.')}
+        'Ga naar <b>aistudio.google.com</b> → <b>Get API key</b> → <b>Create API key</b>. Log in met je Google-account, geen creditcard nodig. Neemt het over als Perplexity het niet doet.')}
       <p class="small muted">Gratis AI mag je vragen en foto's gebruiken om te trainen. Deel geen privé-dingen met de sommelier. Je sleutels blijven op dit toestel.</p>
     </section>
     <section class="card stack">
       <h3>Claude <em>(betaald, optioneel)</em></h3>
       ${keyBlock('claude', 'Claude API-sleutel', 'sk-ant-...', s.apiKey,
         'Op <b>console.anthropic.com</b> → API Keys, met wat tegoed erop. Ongeveer 1 tot 3 cent per vraag.')}
-      <label class="switch" style="border:0;padding-bottom:0"><span><b>Claude als eerste keus</b><br><span class="small muted">Anders alleen Gemini en OpenRouter.</span></span><input type="checkbox" data-change="set-prefer-claude" ${s.preferClaude ? 'checked' : ''}></label>
+      <label class="switch" style="border:0;padding-bottom:0"><span><b>Claude als eerste keus</b><br><span class="small muted">Anders Perplexity en daarna Gemini.</span></span><input type="checkbox" data-change="set-prefer-claude" ${s.preferClaude ? 'checked' : ''}></label>
     </section>
     <section class="card">
       <label class="field"><span>Je naam (voor de begroeting)</span><input id="set-name" value="${esc(s.name)}" placeholder="Koen"></label>
@@ -551,6 +554,8 @@ function wineSheet(id) {
     ${w.tasting ? `<div class="stack" style="gap:4px"><span class="eyebrow">Smaak</span><p>${esc(w.tasting)}</p></div>` : ''}
     ${w.pairsWith ? `<div class="stack" style="gap:4px"><span class="eyebrow">Past bij</span><p>${esc(w.pairsWith)}</p></div>` : ''}
     ${w.notes ? `<div class="stack" style="gap:4px"><span class="eyebrow">Notitie</span><p>${esc(w.notes)}</p></div>` : ''}
+    ${w.sources?.length ? `<div class="stack" style="gap:6px"><span class="eyebrow">Gevonden op internet</span>${w.sources.map((r) =>
+      `<a class="small" href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--gold);overflow-wrap:anywhere">${esc(r.title)}</a>${r.date ? `<span class="small muted" style="margin-top:-4px">${esc(r.date)}</span>` : ''}`).join('')}</div>` : ''}
     <div class="stack">
       <button class="btn wine block" data-action="open-bottle" data-id="${esc(w.id)}" ${w.quantity ? '' : 'disabled'}>Fles openen</button>
       <div class="row" style="flex-wrap:nowrap">
@@ -703,7 +708,20 @@ async function onBarcode(code) {
   try {
     const product = await lookupBarcode(code);
     if (!product) {
-      if (status) status.innerHTML = `<span>Code <b>${esc(code)}</b> staat niet in Open Food Facts. Maak een foto van het etiket of vul hem zelf in.</span>`;
+      // Niet in Open Food Facts: dan het web doorzoeken op de code
+      if (hasSearchKey() && AI.hasKey()) {
+        if (status) status.innerHTML = loading(`Code ${code} op internet zoeken...`);
+        try {
+          const results = await webSearch([`${code}`, `${code} wijn`], { maxResults: 5 });
+          if (results.length) {
+            const wines = await AI.identifyFromSearch(code, sourcesForPrompt(results));
+            if (wines[0]?.name) { wineForm({ ...wines[0], barcode: code }, { title: 'Klopt dit?' }); return; }
+          }
+        } catch (e) {
+          console.warn('Barcode zoeken mislukt:', e.code ?? e.message);
+        }
+      }
+      if (status) status.innerHTML = `<span>Code <b>${esc(code)}</b> kon ik niet vinden. Maak een foto van het etiket of vul hem zelf in.</span>`;
       setTimeout(() => wineForm({ barcode: code }, { title: 'Zelf invullen' }), 1800);
       return;
     }
@@ -840,12 +858,28 @@ const ACTIONS = {
     el.disabled = true;
     el.innerHTML = 'Zoeken...';
     try {
-      const found = normalizeWine(await AI.enrichOnline({ name: w.name, winery: w.winery, vintage: w.vintage, type: w.type }));
+      const base = { name: w.name, winery: w.winery, vintage: w.vintage, type: w.type };
+      // Met een Perplexity-sleutel: eerst echte zoekresultaten ophalen, de AI vult de velden daaruit in
+      let results = [];
+      if (hasSearchKey()) {
+        const name = label(w);
+        try {
+          results = await webSearch([`${name} wijn`, `${name} proefnotities drinkvenster`, `${name} prijs kopen`], { maxResults: 5 });
+        } catch (e) {
+          // Zoeken mislukt: gewoon door zonder bronnen (de AI zoekt dan zelf, als hij dat kan)
+          console.warn('Perplexity Search mislukt:', e.code ?? e.message);
+        }
+      }
+      el.innerHTML = 'Invullen...';
+      const found = normalizeWine(await AI.enrichOnline(base, results.length ? sourcesForPrompt(results) : undefined));
       const merged = { ...w };
-      for (const [k, v] of Object.entries(found)) if (v != null && v !== '' && (merged[k] == null || merged[k] === '' || ['tasting', 'pairsWith'].includes(k)) && !['id', 'quantity', 'type', 'name', 'winery', 'vintage'].includes(k)) merged[k] = v;
-      await db.saveWine(merged);
-      toast('Info aangevuld');
-      wineSheet(w.id);
+      for (const [k, v] of Object.entries(found)) if (v != null && v !== '' && (merged[k] == null || merged[k] === '' || ['tasting', 'pairsWith'].includes(k)) && !['id', 'quantity', 'type', 'name', 'winery', 'vintage', 'sources'].includes(k)) merged[k] = v;
+      if (results.length) merged.sources = results.slice(0, 6).map(({ title, url, date }) => ({ title, url, ...(date ? { date } : {}) }));
+      const saved = await db.saveWine(merged);
+      // Meteen de nieuwe versie tonen, niet wachten tot de kelder opnieuw is ingelezen
+      S.wines = S.wines.map((x) => (x.id === saved.id ? saved : x));
+      toast(results.length ? `Info aangevuld uit ${Math.min(results.length, 8)} bronnen` : 'Info aangevuld');
+      wineSheet(saved.id);
     } catch (e) {
       toast(AI.friendlyError(e));
       el.disabled = false;
@@ -896,8 +930,11 @@ const ACTIONS = {
     msg.style.color = '';
     msg.textContent = 'Testen...';
     try {
-      const used = key ? await AI.testKey(p, key) : null;
-      db.saveSettings({ [{ gemini: 'geminiKey', openrouter: 'openrouterKey', claude: 'apiKey' }[p]]: key });
+      let used = key ? await AI.testKey(p, key) : null;
+      if (key && p === 'perplexity') {
+        try { await testSearch(key); used = `${used} + zoeken`; } catch (e) { used = `${used}, zoeken lukt niet: ${e.message}`; }
+      }
+      db.saveSettings({ [{ perplexity: 'perplexityKey', gemini: 'geminiKey', claude: 'apiKey' }[p]]: key });
       msg.className = 'small';
       msg.style.color = 'var(--ok)';
       msg.textContent = !key ? 'Sleutel gewist.' : used ? `Werkt! (${used})` : 'Werkt! Opgeslagen.';

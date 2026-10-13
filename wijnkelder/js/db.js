@@ -108,7 +108,7 @@ export async function importAll(data, { replace = false } = {}) {
 
 // Instellingen: klein en per toestel
 const SETTINGS_KEY = 'wijnkelder.settings';
-const DEFAULTS = { preferClaude: false, openrouterKey: '', geminiKey: '', geminiModel: '', apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
+const DEFAULTS = { preferClaude: false, perplexityKey: '', geminiKey: '', geminiModel: '', apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
 export function settings() {
   let stored = {};
   try { stored = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {}; } catch {}

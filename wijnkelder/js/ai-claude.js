@@ -2,6 +2,7 @@
 import { Anthropic } from '../vendor/anthropic.js';
 import { extractJson } from './wine.js';
 import * as P from './prompts.js';
+import { promptFor } from './prompts.js';
 
 const MODEL = 'claude-opus-5-5';
 // Bij een (onterechte) weigering door de veiligheidsfilters neemt een ander model het over
@@ -76,15 +77,19 @@ async function askJson(key, { system, content, schema, tools, effort = 'low' }) 
   return tools?.length ? extractJson(text) : JSON.parse(text);
 }
 
-export async function identify(key, { text, image, product }) {
+export async function identify(key, { text, image, product, search }) {
   const content = [];
   if (image) content.push(imageBlock(image));
-  content.push({ type: 'text', text: image ? P.IDENTIFY_IMAGE : product ? P.IDENTIFY_PRODUCT(product) : P.IDENTIFY_TEXT(text) });
+  content.push({ type: 'text', text: promptFor({ text, image, product, search }) });
   const r = await askJson(key, { system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, content, effort: image ? 'medium' : 'low' });
   return r.wines ?? [];
 }
 
-export async function enrichOnline(key, wine) {
+export async function enrichOnline(key, wine, sources) {
+  if (sources) {
+    const r = await askJson(key, { system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, content: [{ type: 'text', text: P.ENRICH_FROM_SOURCES(wine, sources) }] });
+    return r.wines?.[0] ?? {};
+  }
   const r = await askJson(key, {
     system: P.IDENTIFY_SYSTEM(), tools: [WEB_SEARCH], effort: 'medium',
     content: [{ type: 'text', text: P.ENRICH(wine) }],

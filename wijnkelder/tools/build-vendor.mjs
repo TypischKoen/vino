@@ -10,6 +10,7 @@ await mkdir(out, { recursive: true });
 
 const entries = {
   'anthropic.js': "export { default as Anthropic } from '@anthropic-ai/sdk';",
+  'perplexity.js': "export { default as Perplexity } from '@perplexity-ai/perplexity_ai';",
   'barcode.js': "export { BarcodeDetector, prepareZXingModule } from 'barcode-detector/ponyfill';",
 };
 for (const [file, contents] of Object.entries(entries)) {

@@ -45,6 +45,18 @@ export const IDENTIFY_PRODUCT = (product) => `Gevonden via de streepjescode (Ope
 export const ENRICH = (wine) => `Zoek online op: ${JSON.stringify(wine)}.
 Zoek het drinkvenster, smaak, alcohol, druiven, gemiddelde prijs in euro en waar hij goed bij past.
 Antwoord met een JSON-object met (voor zover gevonden) de velden: ${Object.keys(WINE_PROPS).join(', ')}.`;
+export const ENRICH_FROM_SOURCES = (wine, sources) => `Vul de gegevens van deze wijn aan: ${JSON.stringify(wine)}.
+Hieronder staan zoekresultaten van internet (Perplexity Search). Gebruik vooral wat daarin staat; vul alleen aan uit eigen kennis als je het zeker weet.
+Let op: zoekresultaten kunnen over een andere jaargang of een andere wijn gaan. Neem alleen over wat bij deze wijn past.
+Zoek het drinkvenster, smaak, alcohol, druiven, gemiddelde prijs in euro en waar hij goed bij past. Geef precies één wijn.
+
+Zoekresultaten:
+${sources}`;
+export const IDENTIFY_FROM_SEARCH = (code, sources) => `Iemand scande de streepjescode ${code} op een wijnfles. Die staat niet in Open Food Facts.
+Hieronder zoekresultaten van internet voor die code. Maak er precies één wijn van als de resultaten duidelijk over één wijn gaan; anders geef je een lege lijst.
+
+Zoekresultaten:
+${sources}`;
 export const JSON_ONLY = 'Geef als laatste bericht alleen de JSON, zonder uitleg eromheen.';
 
 export const PAIR_SCHEMA = {
@@ -116,4 +128,12 @@ Je mag op internet zoeken of een link lezen als dat echt helpt (prijzen, recensi
 
 Kelder (JSON):
 ${JSON.stringify(cellar)}`;
+}
+
+// Welke herken-prompt bij welke invoer
+export function promptFor({ text, image, product, search }) {
+  if (image) return IDENTIFY_IMAGE;
+  if (search) return IDENTIFY_FROM_SEARCH(search.code, search.sources);
+  if (product) return IDENTIFY_PRODUCT(product);
+  return IDENTIFY_TEXT(text);
 }
