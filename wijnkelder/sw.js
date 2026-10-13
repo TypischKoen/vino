@@ -1,8 +1,8 @@
 // Offline-ondersteuning: de app zelf komt uit de cache, data van API's altijd live.
-const VERSION = 'wijnkelder-v3';
+const VERSION = 'wijnkelder-v4';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
-  'js/app.js', 'js/db.js', 'js/ai.js', 'js/ai-claude.js', 'js/ai-gemini.js', 'js/prompts.js', 'js/wine.js', 'js/scan.js', 'js/image.js', 'js/weather.js',
+  'js/app.js', 'js/db.js', 'js/ai.js', 'js/ai-claude.js', 'js/ai-gemini.js', 'js/ai-openrouter.js', 'js/prompts.js', 'js/wine.js', 'js/scan.js', 'js/image.js', 'js/weather.js',
   'vendor/anthropic.js', 'vendor/barcode.js', 'vendor/zxing_reader.wasm',
   'icons/icon-192.png', 'icons/icon-512.png', 'icons/apple-touch-icon.png',
 ];

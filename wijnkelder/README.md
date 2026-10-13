@@ -37,8 +37,9 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 
 | Koppeling | Waarvoor | Sleutel nodig? |
 |---|---|---|
-| Google Gemini (standaard) | advies, etiketten lezen, sommelier, online zoeken | ja, **gratis** via aistudio.google.com |
-| Claude API (Anthropic, optioneel) | hetzelfde, betaald per gebruik | ja, eigen API-sleutel met tegoed |
+| Google Gemini | advies, etiketten lezen, sommelier, online zoeken | ja, **gratis** via aistudio.google.com |
+| OpenRouter (reserve) | neemt automatisch over als Gemini het niet doet | ja, **gratis** via openrouter.ai |
+| Claude API (optioneel) | hetzelfde, betaald per gebruik | ja, eigen API-sleutel met tegoed |
 | Open Food Facts | streepjescode opzoeken | nee |
 | Open-Meteo | weer-tip | nee |
 | Safari camera + locatie | scannen, foto's, weer | toestemming |
@@ -47,9 +48,10 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemi
 
 1. Zet de app online (zie hieronder) en open de link in **Safari**.
 2. Deel-knop → **Zet op beginscherm** → **Voeg toe**.
-3. Open de app, ga naar **Meer → Instellingen** en kies je AI:
-   - **Gemini (gratis)**: maak een sleutel op aistudio.google.com → Get API key → Create API key. Geen creditcard nodig. Let op: op het gratis abonnement mag Google je vragen en foto's gebruiken om hun AI te verbeteren.
-   - **Claude (betaald)**: sleutel op console.anthropic.com, ongeveer 1 tot 3 cent per advies.
+3. Open de app, ga naar **Meer → Instellingen** en vul een gratis sleutel in, liefst allebei:
+   - **Gemini**: aistudio.google.com → Get API key → Create API key.
+   - **OpenRouter** (reserve): openrouter.ai → Keys → Create Key, en zet bij Settings → Privacy de gratis modellen aan.
+   De app kiest zelf een werkend model en schakelt vanzelf over als de ene dienst het niet doet. Gratis AI mag je vragen gebruiken om te trainen.
 
 ## Online zetten met GitHub Pages (gratis)
 
