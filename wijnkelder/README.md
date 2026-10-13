@@ -1,6 +1,6 @@
 # Wijnkelder
 
-Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier die bij elk gerecht een fles uit **je eigen kelder** kiest.
+Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier (Gemini of Claude) die bij elk gerecht een fles uit **je eigen kelder** kiest.
 
 ## Wat kan hij
 
@@ -37,7 +37,8 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier die b
 
 | Koppeling | Waarvoor | Sleutel nodig? |
 |---|---|---|
-| Claude API (Anthropic) | advies, etiketten lezen, sommelier, online zoeken | ja, je eigen API-sleutel |
+| Google Gemini (standaard) | advies, etiketten lezen, sommelier, online zoeken | ja, **gratis** via aistudio.google.com |
+| Claude API (Anthropic, optioneel) | hetzelfde, betaald per gebruik | ja, eigen API-sleutel met tegoed |
 | Open Food Facts | streepjescode opzoeken | nee |
 | Open-Meteo | weer-tip | nee |
 | Safari camera + locatie | scannen, foto's, weer | toestemming |
@@ -46,7 +47,9 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier die b
 
 1. Zet de app online (zie hieronder) en open de link in **Safari**.
 2. Deel-knop → **Zet op beginscherm** → **Voeg toe**.
-3. Open de app, ga naar **Meer → Instellingen** en plak je Claude API-sleutel (aan te maken op console.anthropic.com). Een advies kost ongeveer 1 tot 3 cent.
+3. Open de app, ga naar **Meer → Instellingen** en kies je AI:
+   - **Gemini (gratis)**: maak een sleutel op aistudio.google.com → Get API key → Create API key. Geen creditcard nodig. Let op: op het gratis abonnement mag Google je vragen en foto's gebruiken om hun AI te verbeteren.
+   - **Claude (betaald)**: sleutel op console.anthropic.com, ongeveer 1 tot 3 cent per advies.
 
 ## Online zetten met GitHub Pages (gratis)
 
@@ -57,7 +60,7 @@ Een iPhone-app (webapp) die je wijnvoorraad bijhoudt, met een AI-sommelier die b
 ## Goed om te weten
 
 - Alles (flessen, foto's, logboek) staat **alleen op je telefoon**. Maak af en toe een backup via Meer → Backup.
-- De API-sleutel staat ook alleen op je telefoon en gaat direct naar Anthropic. Iedereen die jouw telefoon gebruikt kan hem dus gebruiken.
+- De API-sleutel staat ook alleen op je telefoon en gaat direct naar Google of Anthropic. Iedereen die jouw telefoon gebruikt kan hem dus gebruiken.
 - Na het toevoegen aan je beginscherm werkt de app ook offline. Alleen advies, scannen en de sommelier hebben internet nodig.
 
 ## Voor ontwikkelaars

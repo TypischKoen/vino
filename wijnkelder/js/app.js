@@ -2,7 +2,7 @@ import * as db from './db.js';
 import * as AI from './ai.js';
 import { TYPES, TYPE_KEYS, STATUS_LABEL, SORTS, label, drinkStatus, stats, matches, cellarForPrompt, normalizeWine, toCsv, euro } from './wine.js';
 import { startScanner, scanImage, lookupBarcode } from './scan.js';
-import { toClaudeImage, thumbnail } from './image.js';
+import { toAiImage, thumbnail } from './image.js';
 import * as weather from './weather.js';
 
 const $ = (s, root = document) => root.querySelector(s);
@@ -427,11 +427,25 @@ function viewSettings() {
   return `<div class="view">${back}
     <header class="top"><span class="eyebrow">Afstellen</span><h1><em>Instellingen</em></h1></header>
     <section class="card stack">
-      <h3>Claude API-sleutel</h3>
-      <p class="small muted">Nodig voor het wijnadvies, etiketten lezen en de sommelier. Maak er een aan op <b>console.anthropic.com</b> → API Keys en zet er wat tegoed op. Een advies kost ongeveer 1 tot 3 cent.</p>
+      <h3>Welke AI?</h3>
+      <div class="wrap-chips">
+        <button class="chip" data-action="set-provider" data-provider="gemini" aria-pressed="${AI.provider() === 'gemini'}">Gemini · gratis</button>
+        <button class="chip" data-action="set-provider" data-provider="claude" aria-pressed="${AI.provider() === 'claude'}">Claude · betaald</button>
+      </div>
+      ${AI.provider() === 'gemini' ? `
+      <p class="small muted">Gratis binnen de limieten van Google. Maak een sleutel op <b>aistudio.google.com</b> → <b>Get API key</b> → <b>Create API key</b>. Geen creditcard nodig.</p>
+      <input id="gemini-key" type="password" autocomplete="off" placeholder="AIza..." value="${esc(s.geminiKey)}">
+      <details class="small"><summary class="muted" style="cursor:pointer">Geavanceerd: model</summary>
+        <input id="gemini-model" style="margin-top:8px" autocomplete="off" placeholder="${esc(AI.GEMINI_DEFAULT_MODEL)}" value="${esc(s.geminiModel)}">
+        <p class="small muted" style="margin-top:6px">Leeg laten = altijd het nieuwste gratis Flash-model.</p>
+      </details>
+      <div class="row"><button class="btn" data-action="save-key" data-provider="gemini">Opslaan en testen</button><span id="key-msg" class="small"></span></div>
+      <p class="small muted">Let op: bij het gratis abonnement mag Google je vragen en foto's gebruiken om hun AI te verbeteren. Deel dus geen privé-dingen met de sommelier.</p>`
+      : `
+      <p class="small muted">Maak een sleutel op <b>console.anthropic.com</b> → API Keys en zet er wat tegoed op. Een advies kost ongeveer 1 tot 3 cent.</p>
       <input id="api-key" type="password" autocomplete="off" placeholder="sk-ant-..." value="${esc(s.apiKey)}">
-      <div class="row"><button class="btn" data-action="save-key">Opslaan en testen</button><span id="key-msg" class="small"></span></div>
-      <p class="small muted">De sleutel blijft op dit toestel en gaat alleen naar Anthropic. Deel je toestel of deze app niet met iemand die je niet vertrouwt.</p>
+      <div class="row"><button class="btn" data-action="save-key" data-provider="claude">Opslaan en testen</button><span id="key-msg" class="small"></span></div>`}
+      <p class="small muted">Je sleutel blijft op dit toestel en gaat alleen naar ${AI.provider() === 'gemini' ? 'Google' : 'Anthropic'}.</p>
     </section>
     <section class="card">
       <label class="field"><span>Je naam (voor de begroeting)</span><input id="set-name" value="${esc(s.name)}" placeholder="Koen"></label>
@@ -620,7 +634,7 @@ function addSheet() {
       <button class="method" data-action="add-text" ${key ? '' : 'aria-disabled="true"'}><span class="ic">✍️</span><b>Typ het</b><span>"6 flessen Cava en een Barolo 2018"</span></button>
       <button class="method" data-action="add-manual"><span class="ic">📝</span><b>Zelf invullen</b><span>Alle velden met de hand</span></button>
     </div>
-    ${key ? '' : '<p class="small muted">Foto en typen werken met Claude. Zet je API-sleutel bij Meer > Instellingen.</p>'}
+    ${key ? '' : '<p class="small muted">Foto en typen werken met AI. Zet een (gratis) Gemini-sleutel bij Meer > Instellingen.</p>'}
     <div id="add-status"></div>`);
 }
 
@@ -691,7 +705,7 @@ async function onBarcode(code) {
       return;
     }
     if (AI.hasKey()) {
-      if (status) status.innerHTML = loading(`Gevonden: ${product.naam ?? code}. Claude vult de rest aan...`);
+      if (status) status.innerHTML = loading(`Gevonden: ${product.naam ?? code}. ${AI.providerLabel()} vult de rest aan...`);
       const wines = await AI.identifyFromProduct(product);
       wineForm({ ...(wines[0] ?? {}), barcode: code }, { title: 'Klopt dit?' });
     } else {
@@ -709,7 +723,7 @@ async function doPair() {
   p.dish = $('#dish')?.value.trim() ?? p.dish;
   p.url = $('#pair-url')?.value.trim() ?? p.url;
   if (!p.dish && !p.image && !p.url) { toast('Vertel eerst wat je eet'); $('#dish')?.focus(); return; }
-  if (!AI.hasKey()) { toast('Zet eerst je API-sleutel bij Instellingen'); go('meer', 'instellingen'); return; }
+  if (!AI.hasKey()) { toast('Zet eerst je AI-sleutel bij Instellingen'); go('meer', 'instellingen'); return; }
   Object.assign(p, { loading: true, error: '', result: null });
   render();
   $('#pair-result')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -746,13 +760,10 @@ async function chatSend(text) {
   const c = S.chat;
   text = (text ?? $('#chat-input')?.value ?? '').trim();
   if (!text && !c.image) return;
-  if (!AI.hasKey()) { toast('Zet eerst je API-sleutel bij Instellingen'); go('meer', 'instellingen'); return; }
+  if (!AI.hasKey()) { toast('Zet eerst je AI-sleutel bij Instellingen'); go('meer', 'instellingen'); return; }
   if (c.busy) return;
   c.system ??= AI.chatSystem(cellarForPrompt(S.wines, YEAR), db.settings().name);
-  const content = [];
-  if (c.image) content.push({ type: 'image', source: { type: 'base64', media_type: c.image.mediaType, data: c.image.data } });
-  content.push({ type: 'text', text: text || 'Wat zie je op deze foto, en wat betekent het voor mij?' });
-  c.history.push({ role: 'user', content });
+  c.history.push({ role: 'user', text: text || 'Wat zie je op deze foto, en wat betekent het voor mij?', image: c.image });
   c.display.push({ role: 'user', text: text || '(foto)', preview: c.preview });
   const live = { role: 'assistant', text: '', live: true };
   c.display.push(live);
@@ -763,12 +774,11 @@ async function chatSend(text) {
       system: c.system, history: c.history, signal: c.ctl.signal,
       onText: (t) => { live.text = t; const el = $('#chat-live'); if (el) { el.innerHTML = md(t); window.scrollTo(0, document.body.scrollHeight); } },
     });
-    c.history.push({ role: 'assistant', content: r.content });
+    c.history.push({ role: 'assistant', text: r.text, raw: r.raw });
     live.text = r.text;
   } catch (e) {
     c.history.pop(); // vraag zonder antwoord niet meenemen naar de volgende beurt
-    if (e?.name !== 'AbortError' && !(e instanceof Error && /abort/i.test(e.message))) live.error = AI.friendlyError(e);
-    else live.error = 'Gestopt.';
+    live.error = AI.isAbort(e) ? 'Gestopt.' : AI.friendlyError(e);
   } finally {
     live.live = false;
     c.busy = false;
@@ -822,7 +832,7 @@ const ACTIONS = {
     toast('Verwijderd');
   },
   enrich: async (el) => {
-    if (!AI.hasKey()) { toast('Zet eerst je API-sleutel bij Instellingen'); return; }
+    if (!AI.hasKey()) { toast('Zet eerst je AI-sleutel bij Instellingen'); return; }
     const w = S.wines.find((x) => x.id === el.dataset.id);
     el.disabled = true;
     el.innerHTML = 'Zoeken...';
@@ -849,7 +859,7 @@ const ACTIONS = {
   'form-type': (el) => { $('.sheet')._form.state.type = el.dataset.type; $$('.sheet [data-action="form-type"]').forEach((b) => b.setAttribute('aria-pressed', b === el)); },
   'form-rate': (el) => { const st = $('.sheet')._form.state; st.rating = Number(el.dataset.value) === st.rating ? 0 : Number(el.dataset.value); $('#form-stars').innerHTML = stars(st.rating, 'form-rate'); },
   'add-scan': () => scanSheet(),
-  'add-text': (el) => { if (el.getAttribute('aria-disabled') === 'true') { toast('Zet eerst je API-sleutel bij Instellingen'); return; } textSheet(); },
+  'add-text': (el) => { if (el.getAttribute('aria-disabled') === 'true') { toast('Zet eerst je AI-sleutel bij Instellingen'); return; } textSheet(); },
   'add-manual': () => wineForm(),
   'review-edit': (el) => {
     const items = $('.sheet')._review;
@@ -875,14 +885,18 @@ const ACTIONS = {
     const item = S.wishlist.find((x) => x.id === el.dataset.id);
     wineForm({ name: item.text }, { title: 'Gekocht!', onDone: async (w) => { await addWines([w], w.photo); await db.put('wishlist', { ...item, done: true }); toast('In de kelder gezet'); } });
   },
-  'save-key': async () => {
-    const key = $('#api-key').value.trim();
+  'set-provider': (el) => { db.saveSettings({ provider: el.dataset.provider }); render(); },
+  'save-key': async (el) => {
+    const which = el.dataset.provider;
+    const key = $(which === 'claude' ? '#api-key' : '#gemini-key').value.trim();
+    const model = $('#gemini-model')?.value.trim() ?? '';
     const msg = $('#key-msg');
     msg.className = 'small muted';
+    msg.style.color = '';
     msg.textContent = 'Testen...';
     try {
-      if (key) await AI.testKey(key);
-      db.saveSettings({ apiKey: key });
+      if (key) await AI.testKey(which, key, model);
+      db.saveSettings(which === 'claude' ? { apiKey: key } : { geminiKey: key, geminiModel: model });
       msg.className = 'small';
       msg.style.color = 'var(--ok)';
       msg.textContent = key ? 'Werkt! Opgeslagen.' : 'Sleutel gewist.';
@@ -915,14 +929,14 @@ const CHANGES = {
     const file = el.files[0];
     if (!file) return;
     S.pair.dish = $('#dish')?.value ?? S.pair.dish;
-    S.pair.image = await toClaudeImage(file);
+    S.pair.image = await toAiImage(file);
     S.pair.preview = `data:${S.pair.image.mediaType};base64,${S.pair.image.data}`;
     render();
   },
   'chat-photo': async (el) => {
     const file = el.files[0];
     if (!file) return;
-    S.chat.image = await toClaudeImage(file);
+    S.chat.image = await toAiImage(file);
     S.chat.preview = `data:${S.chat.image.mediaType};base64,${S.chat.image.data}`;
     render();
     toast('Foto klaar, typ je vraag erbij');
@@ -934,7 +948,7 @@ const CHANGES = {
     status.innerHTML = loading('Etiket lezen...');
     $$('.method').forEach((m) => { m.style.pointerEvents = 'none'; });
     try {
-      const wines = await AI.identifyFromImage(await toClaudeImage(file));
+      const wines = await AI.identifyFromImage(await toAiImage(file));
       await handleFound(wines, file);
     } catch (e) {
       status.innerHTML = `<p class="danger small">${esc(AI.friendlyError(e))}</p>`;

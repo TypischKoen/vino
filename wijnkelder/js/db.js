@@ -108,9 +108,13 @@ export async function importAll(data, { replace = false } = {}) {
 
 // Instellingen: klein en per toestel
 const SETTINGS_KEY = 'wijnkelder.settings';
-const DEFAULTS = { apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
+const DEFAULTS = { provider: 'gemini', geminiKey: '', geminiModel: '', apiKey: '', weather: false, theme: 'auto', webSearch: true, name: '' };
 export function settings() {
-  try { return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(SETTINGS_KEY)) }; } catch { return { ...DEFAULTS }; }
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(SETTINGS_KEY)) ?? {}; } catch {}
+  // Wie al een Claude-sleutel had van voor de Gemini-optie, blijft op Claude
+  if (!stored.provider && stored.apiKey) stored.provider = 'claude';
+  return { ...DEFAULTS, ...stored };
 }
 export function saveSettings(patch) {
   const next = { ...settings(), ...patch };
