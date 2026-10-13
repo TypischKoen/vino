@@ -1,10 +1,14 @@
-// Perplexity (Sonar): betaald van je tegoed, zoekt zelf op internet. Handig voor wijninfo en prijzen.
+// Perplexity Agent API (POST /v1/responses), de opvolger van Sonar (/chat/completions).
+// Vormen van verzoek en antwoord volgen de officiële SDK (@perplexity-ai/perplexity_ai, ResponsesRequestInput).
+// Bewust een simpele fetch met alleen Authorization + Content-Type: dat komt vanuit een webapp door.
 import { extractJson } from './wine.js';
 import * as P from './prompts.js';
 import { promptFor } from './prompts.js';
 
-const BASE = 'https://api.perplexity.ai';
-export const MODEL = 'sonar';
+const URL_RESPONSES = 'https://api.perplexity.ai/v1/responses';
+// De SDK-voorbeelden gebruiken 'sonar'; staat Perplexity alleen de lange naam toe, dan die
+const MODELS = ['sonar', 'perplexity/sonar'];
+const MODEL_KEY = 'wijnkelder.perplexityModel';
 
 export class PerplexityError extends Error {
   constructor(code, message, detail = '') { super(message); this.code = code; this.detail = detail; }
@@ -17,86 +21,111 @@ export function friendlyError(e) {
 
 export const isAbort = (e) => e?.name === 'AbortError';
 
+const remembered = () => { try { return localStorage.getItem(MODEL_KEY); } catch { return null; } };
+const remember = (m) => { try { localStorage.setItem(MODEL_KEY, m); } catch {} };
+const modelOrder = () => [...new Set([remembered(), ...MODELS].filter(Boolean))];
+
 async function raise(res) {
   let body = {};
   try { body = await res.json(); } catch {}
-  const msg = body.error?.message ?? body.detail ?? '';
-  if (res.status === 401) throw new PerplexityError('badkey', 'Je Perplexity-sleutel klopt niet. Check hem bij Instellingen.', String(msg));
-  if (res.status === 402 || /credit|balance|quota exceeded|insufficient/i.test(String(msg))) {
-    throw new PerplexityError('credits', 'Je Perplexity-tegoed is op. Waardeer op via perplexity.ai, of de app gebruikt de gratis AI.', String(msg));
+  const msg = String(body.error?.message ?? body.detail ?? body.message ?? '');
+  if (res.status === 401) throw new PerplexityError('badkey', 'Je Perplexity-sleutel klopt niet. Check hem bij Instellingen.', msg);
+  if (res.status === 402 || /credit|balance|insufficient/i.test(msg)) {
+    throw new PerplexityError('credits', 'Je Perplexity-tegoed is op. Waardeer op in de API Console (console.perplexity.ai), of de app gebruikt de gratis AI.', msg);
   }
-  if (res.status === 429) throw new PerplexityError('quota', 'Even te veel vragen bij Perplexity. Probeer het zo nog eens.', String(msg));
-  if (res.status >= 500) throw new PerplexityError('busy', 'Perplexity is even overbelast. Probeer het zo nog eens.', String(msg));
-  if (/image|vision/i.test(String(msg))) throw new PerplexityError('novision', 'Perplexity kon de foto niet lezen.', String(msg));
-  throw new PerplexityError('bad', 'Perplexity snapte het verzoek niet.', String(msg));
+  if (res.status === 429) {
+    const wait = res.headers.get('retry-after');
+    throw new PerplexityError('quota', `Even te veel vragen bij Perplexity.${wait ? ` Probeer het over ${wait} seconden opnieuw.` : ' Probeer het zo opnieuw.'}`, msg);
+  }
+  if (res.status >= 500) throw new PerplexityError('busy', 'Perplexity is even overbelast. Probeer het zo nog eens.', msg);
+  if ((res.status === 400 || res.status === 404) && /model/i.test(msg)) throw new PerplexityError('model', 'Perplexity kent dit model niet.', msg);
+  if (/image|vision/i.test(msg)) throw new PerplexityError('novision', 'Perplexity kon de foto niet lezen.', msg);
+  throw new PerplexityError('bad', 'Perplexity snapte het verzoek niet.', msg);
 }
 
-async function post(key, body, signal) {
-  let res;
-  try {
-    res = await fetch(`${BASE}/chat/completions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({ model: MODEL, ...body }),
-      signal,
-    });
-  } catch (e) {
-    if (isAbort(e)) throw e;
-    // Internet is er wel, maar het verzoek komt niet door: Perplexity blokkeert dan verzoeken uit webapps (CORS)
-    if (navigator.onLine !== false) {
-      throw new PerplexityError('cors', 'Perplexity laat deze app niet verbinden (ze blokkeren verzoeken vanuit webapps). De app gebruikt dan vanzelf de gratis AI.');
+async function send(key, body, signal) {
+  let lastError;
+  for (const model of modelOrder()) {
+    let res;
+    try {
+      res = await fetch(URL_RESPONSES, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
+        body: JSON.stringify({ model, ...body }),
+        signal,
+      });
+    } catch (e) {
+      if (isAbort(e)) throw e;
+      if (navigator.onLine !== false) throw new PerplexityError('cors', 'Perplexity laat deze app niet verbinden. De app gebruikt dan vanzelf de gratis AI.');
+      throw new PerplexityError('net', 'Geen verbinding. Check je internet.');
     }
-    throw new PerplexityError('net', 'Geen verbinding. Check je internet.');
-  }
-  // Kent Perplexity de instelling "niet zoeken" niet, dan nog een keer zonder
-  if (res.status === 400 && 'disable_search' in body) {
-    const peek = await res.clone().text().catch(() => '');
-    if (/disable_search|unrecognized|unknown|extra/i.test(peek)) {
-      const { disable_search, ...rest } = body;
-      return post(key, rest, signal);
+    if (res.ok) { remember(model); return res; }
+    try { await raise(res); } catch (e) {
+      if (e.code !== 'model') throw e;
+      lastError = e;
     }
   }
-  if (!res.ok) await raise(res);
-  return res;
+  throw lastError;
 }
 
-// Bronvermeldingen als [1] weghalen, die zeggen in de app niks
+// Bronnummers als [1] weghalen, die zeggen in de app niks
 const clean = (t) => t.replace(/\s*\[\d+(?:,\s*\d+)*\]/g, '').replace(/[ \t]+\n/g, '\n');
 
-const userContent = (text, image) => (image
-  ? [{ type: 'text', text }, { type: 'image_url', image_url: { url: `data:${image.mediaType};base64,${image.data}` } }]
-  : text);
+function content(text, image) {
+  if (!image) return text;
+  return [
+    { type: 'input_text', text },
+    { type: 'input_image', image_url: `data:${image.mediaType};base64,${image.data}` },
+  ];
+}
 
-function answer(data) {
-  const choice = data.choices?.[0];
-  if (choice?.finish_reason === 'length') throw new PerplexityError('cut', 'Het antwoord werd te lang en is afgekapt. Probeer het nog eens.');
-  const text = choice?.message?.content ?? '';
+// Tekst uit output[]: alle message-items, alle output_text-delen (zoals de SDK zijn output_text maakt)
+export function outputText(response) {
+  return (response.output ?? [])
+    .filter((item) => item.type === 'message')
+    .flatMap((item) => item.content ?? [])
+    .filter((part) => part.type === 'output_text' && part.text)
+    .map((part) => part.text)
+    .join('');
+}
+
+function check(response) {
+  if (response.status === 'failed' || response.error) {
+    throw new PerplexityError('busy', 'Perplexity kon geen antwoord maken.', response.error?.message ?? '');
+  }
+  const text = outputText(response);
   if (!text.trim()) throw new PerplexityError('empty', 'Perplexity gaf een leeg antwoord. Probeer het nog eens.');
   return text;
 }
 
-async function askJson(key, { system, text, image, schema, search = false }) {
+const webTools = ({ search, fetchUrl }) => [
+  ...(search ? [{ type: 'web_search', search_context_size: 'medium', user_location: { country: 'NL' } }] : []),
+  ...(fetchUrl ? [{ type: 'fetch_url', max_urls: 2 }] : []),
+];
+
+// Zonder tools zoekt de Agent API niet op internet (scheelt tegoed)
+async function askJson(key, { system, text, image, schema, name, search = false, fetchUrl = false }) {
+  const tools = webTools({ search, fetchUrl });
   const body = {
-    messages: [
-      { role: 'system', content: `${system}\n\nAntwoord met alleen geldige JSON volgens het schema.` },
-      { role: 'user', content: userContent(text, image) },
-    ],
-    response_format: { type: 'json_schema', json_schema: { schema } },
+    instructions: system,
+    input: [{ type: 'message', role: 'user', content: content(text, image) }],
+    response_format: { type: 'json_schema', json_schema: { name, schema } },
+    max_output_tokens: 4000,
+    ...(tools.length ? { tools } : {}),
   };
-  // Zoeken kost per vraag extra; alleen aanzetten waar het iets oplevert
-  if (!search) body.disable_search = true;
-  const res = await post(key, body);
-  return extractJson(answer(await res.json()));
+  const res = await send(key, body);
+  return extractJson(check(await res.json()));
 }
 
 export async function testKey(key) {
-  await post(key, { messages: [{ role: 'user', content: 'Antwoord met alleen het woord: ok' }], max_tokens: 20, disable_search: true });
-  return MODEL;
+  const res = await send(key, { input: 'Antwoord met alleen het woord: ok', max_output_tokens: 20 });
+  check(await res.json());
+  return remembered() ?? MODELS[0];
 }
 
 export async function identify(key, { text, image, product, search }) {
   const r = await askJson(key, {
-    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, image,
+    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, name: 'wijnen', image,
     text: promptFor({ text, image, product, search }),
   });
   return Array.isArray(r) ? r : r.wines ?? [];
@@ -104,27 +133,31 @@ export async function identify(key, { text, image, product, search }) {
 
 export async function enrichOnline(key, wine, sources) {
   const r = await askJson(key, {
-    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, search: !sources,
+    system: P.IDENTIFY_SYSTEM(), schema: P.WINES_SCHEMA, name: 'wijnen', search: !sources,
     text: sources ? P.ENRICH_FROM_SOURCES(wine, sources) : `${P.ENRICH(wine)} Geef precies één wijn in de lijst.`,
   });
   return Array.isArray(r) ? r[0] : r.wines?.[0] ?? r;
 }
 
 export async function pair(key, args) {
-  // Met een recept-link zoekt Perplexity het recept zelf op
-  return askJson(key, { system: P.PAIR_SYSTEM(), schema: P.PAIR_SCHEMA, text: P.pairText(args), image: args.image, search: Boolean(args.url) });
+  // Met een recept-link leest Perplexity die pagina zelf (fetch_url)
+  return askJson(key, {
+    system: P.PAIR_SYSTEM(), schema: P.PAIR_SCHEMA, name: 'wijnadvies',
+    text: P.pairText(args), image: args.image, fetchUrl: Boolean(args.url),
+  });
 }
 
 // history: [{role: 'user', text, image?} | {role: 'assistant', text}]
 export async function chat(key, { system, history, onText, signal, webSearch }) {
   const lastImage = history.findLastIndex((m) => m.image);
-  const messages = [
-    { role: 'system', content: system },
-    ...history.map((m, i) => ({ role: m.role, content: m.role === 'user' ? userContent(m.text, i === lastImage ? m.image : null) : m.text })),
-  ];
-  const body = { messages, stream: true };
-  if (!webSearch) body.disable_search = true;
-  const res = await post(key, body, signal);
+  const input = history.map((m, i) => ({
+    type: 'message',
+    role: m.role,
+    content: m.role === 'user' ? content(m.text, i === lastImage ? m.image : null) : m.text,
+  }));
+  const tools = webTools({ search: webSearch, fetchUrl: webSearch });
+  const res = await send(key, { instructions: system, input, stream: true, ...(tools.length ? { tools } : {}) }, signal);
+
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
@@ -138,11 +171,18 @@ export async function chat(key, { system, history, onText, signal, webSearch }) 
     for (const line of lines) {
       if (!line.startsWith('data:')) continue;
       const payload = line.slice(5).trim();
-      if (payload === '[DONE]') continue;
-      let data;
-      try { data = JSON.parse(payload); } catch { continue; }
-      const delta = data.choices?.[0]?.delta?.content;
-      if (delta) { text += delta; onText?.(clean(text)); }
+      if (!payload || payload === '[DONE]') continue;
+      let ev;
+      try { ev = JSON.parse(payload); } catch { continue; }
+      if (ev.type === 'response.output_text.delta' && ev.delta) {
+        text += ev.delta;
+        onText?.(clean(text));
+      } else if (ev.type === 'response.failed') {
+        throw new PerplexityError('busy', 'Perplexity kon geen antwoord maken.', ev.error?.message ?? '');
+      } else if (ev.type === 'response.completed' && !text && ev.response) {
+        text = outputText(ev.response); // geen losse stukjes ontvangen: pak het hele antwoord
+        if (text) onText?.(clean(text));
+      }
     }
   }
   if (!text) throw new PerplexityError('empty', 'Perplexity gaf een leeg antwoord. Probeer het nog eens.');

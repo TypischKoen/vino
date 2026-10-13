@@ -1,5 +1,5 @@
 // Offline-ondersteuning: de app zelf komt uit de cache, data van API's altijd live.
-const VERSION = 'wijnkelder-v6';
+const VERSION = 'wijnkelder-v7';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest', 'css/app.css',
   'js/app.js', 'js/db.js', 'js/ai.js', 'js/ai-claude.js', 'js/ai-gemini.js', 'js/ai-perplexity.js', 'js/prompts.js', 'js/search.js', 'js/wine.js', 'js/scan.js', 'js/image.js', 'js/weather.js',
