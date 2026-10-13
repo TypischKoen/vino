@@ -1,0 +1,23 @@
+{
+  "name": "Wijnkelder",
+  "short_name": "Wijnkelder",
+  "description": "Je wijnvoorraad op zak, met een AI-sommelier die bij elk gerecht een fles uit je eigen kelder kiest.",
+  "lang": "nl",
+  "start_url": "./#vandaag",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#120d11",
+  "theme_color": "#120d11",
+  "categories": ["food", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Wijn bij mijn eten", "url": "./#vandaag", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Fles toevoegen", "url": "./#kelder", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Sommelier", "url": "./#sommelier", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
